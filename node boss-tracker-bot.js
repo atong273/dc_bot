@@ -1,6 +1,8 @@
 // Discord Bot for Boss Respawn Tracker
 // Requires: Node.js, discord.js, node-fetch, dotenv
 
+require('./keep_alive.js');
+
 const { Client, Intents, MessageEmbed } = require('discord.js');
 const fetch = require('node-fetch');
 require('dotenv').config();
