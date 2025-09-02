@@ -3,15 +3,16 @@
 
 require('./keep_alive.js');
 
-const { Client, Intents, MessageEmbed } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const fetch = require('node-fetch');
 require('dotenv').config();
 
 // Bot configuration
 const client = new Client({ 
     intents: [
-        Intents.FLAGS.GUILDS,
-        Intents.FLAGS.GUILD_MESSAGES
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
     ] 
 });
 
@@ -181,16 +182,18 @@ function findBossByName(name) {
 function formatBossInfo(boss) {
     const timeRemaining = getTimeRemaining(boss);
     
-    let embed = new MessageEmbed()
+    let embed = new EmbedBuilder()
         .setTitle(`${boss.name} (Level ${boss.level})`)
-        .addField('Map', boss.map, true)
-        .addField('Type', boss.type === 'fixed' ? 'Fixed Schedule' : 'Regular', true)
-        .addField('Last Killed', boss.lastKilled || 'N/A', true)
-        .addField('Respawn Time', boss.respawnTime || 'N/A', true)
-        .addField('Time Remaining', timeRemaining.text, true);
+        .addFields(
+            { name: 'Map', value: boss.map, inline: true },
+            { name: 'Type', value: boss.type === 'fixed' ? 'Fixed Schedule' : 'Regular', inline: true },
+            { name: 'Last Killed', value: boss.lastKilled || 'N/A', inline: true },
+            { name: 'Respawn Time', value: boss.respawnTime || 'N/A', inline: true },
+            { name: 'Time Remaining', value: timeRemaining.text, inline: true }
+        );
     
     if (boss.note) {
-        embed.addField('Note', boss.note);
+        embed.addFields({ name: 'Note', value: boss.note });
     }
     
     // Set color based on time remaining
@@ -220,14 +223,14 @@ client.on('messageCreate', async message => {
             return message.channel.send('No bosses are ready at the moment.');
         }
         
-        const embed = new MessageEmbed()
+        const embed = new EmbedBuilder()
             .setTitle('Ready Bosses')
             .setColor('#3fb950') // Green
             .setDescription('The following bosses are ready to fight:')
-            .setFooter(`Last updated: ${lastUpdated ? lastUpdated.toLocaleString() : 'Never'}`);
+            .setFooter({ text: `Last updated: ${lastUpdated ? lastUpdated.toLocaleString() : 'Never'}` });
         
         readyBosses.forEach(boss => {
-            embed.addField(boss.name, `${boss.map} (Level ${boss.level})`, true);
+            embed.addFields({ name: boss.name, value: `${boss.map} (Level ${boss.level})`, inline: true });
         });
         
         message.channel.send({ embeds: [embed] });
@@ -240,21 +243,19 @@ client.on('messageCreate', async message => {
             return message.channel.send('No upcoming bosses found.');
         }
         
-        const embed = new MessageEmbed()
+        const embed = new EmbedBuilder()
             .setTitle('Next Bosses Spawning')
             .setColor('#d29922') // Yellow/Orange
             .setDescription('The next bosses to spawn are:')
-            .setFooter(`Last updated: ${lastUpdated ? lastUpdated.toLocaleString() : 'Never'}`);
+            .setFooter({ text: `Last updated: ${lastUpdated ? lastUpdated.toLocaleString() : 'Never'}` });
         
         nextBosses.forEach(({ boss, timeRemaining }) => {
             const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
             const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
             
-            embed.addField(
-                boss.name, 
-                `${boss.map} (Level ${boss.level})\nTime: ${hours}h ${minutes}m ${seconds}s`,
-                true
+            embed.addFields(
+                { name: boss.name, value: `${boss.map} (Level ${boss.level})\nTime: ${hours}h ${minutes}m ${seconds}s`, inline: true }
             );
         });
         
@@ -274,7 +275,7 @@ client.on('messageCreate', async message => {
         }
         
         const embed = formatBossInfo(boss)
-            .setFooter(`Last updated: ${lastUpdated ? lastUpdated.toLocaleString() : 'Never'}`);
+            .setFooter({ text: `Last updated: ${lastUpdated ? lastUpdated.toLocaleString() : 'Never'}` });
         
         message.channel.send({ embeds: [embed] });
     }
@@ -297,18 +298,16 @@ client.on('messageCreate', async message => {
         const endIndex = Math.min(startIndex + itemsPerPage, bossData.length);
         const pageBosses = bossData.slice(startIndex, endIndex);
         
-        const embed = new MessageEmbed()
+        const embed = new EmbedBuilder()
             .setTitle('Boss List')
             .setColor('#58a6ff') // Blue
             .setDescription(`Showing bosses ${startIndex + 1}-${endIndex} of ${bossData.length}`)
-            .setFooter(`Page ${page} of ${pages} • Last updated: ${lastUpdated ? lastUpdated.toLocaleString() : 'Never'}`);
+            .setFooter({ text: `Page ${page} of ${pages} • Last updated: ${lastUpdated ? lastUpdated.toLocaleString() : 'Never'}` });
         
         pageBosses.forEach(boss => {
             const timeRemaining = getTimeRemaining(boss);
-            embed.addField(
-                `${boss.name} (Level ${boss.level})`,
-                `${boss.map} • ${timeRemaining.text}`,
-                false
+            embed.addFields(
+                { name: `${boss.name} (Level ${boss.level})`, value: `${boss.map} • ${timeRemaining.text}`, inline: false }
             );
         });
         
@@ -316,24 +315,26 @@ client.on('messageCreate', async message => {
     }
     
     else if (command === 'help') {
-        const embed = new MessageEmbed()
+        const embed = new EmbedBuilder()
             .setTitle('Boss Respawn Tracker - Help')
             .setColor('#58a6ff') // Blue
             .setDescription('Available commands:')
-            .addField('!ready', 'Shows bosses that are ready to fight now')
-            .addField('!next', 'Shows the next 2 bosses that will spawn')
-            .addField('!boss [name]', 'Shows information about a specific boss')
-            .addField('!list [page]', 'Shows all bosses with respawn times (paginated)')
-            .addField('!help', 'Shows this help message')
-            .addField('!update', 'Forces an update of the boss data (admin only)')
-            .setFooter('Data from Volvie\'s Spreadsheet');
+            .addFields(
+                { name: '!ready', value: 'Shows bosses that are ready to fight now' },
+                { name: '!next', value: 'Shows the next 2 bosses that will spawn' },
+                { name: '!boss [name]', value: 'Shows information about a specific boss' },
+                { name: '!list [page]', value: 'Shows all bosses with respawn times (paginated)' },
+                { name: '!help', value: 'Shows this help message' },
+                { name: '!update', value: 'Forces an update of the boss data (admin only)' }
+            )
+            .setFooter({ text: 'Data from Volvie\'s Spreadsheet' });
         
         message.channel.send({ embeds: [embed] });
     }
     
     else if (command === 'update') {
         // Simple admin check (you might want to implement proper permissions)
-        if (!message.member.permissions.has('ADMINISTRATOR')) {
+        if (!message.member.permissions.has('Administrator')) {
             return message.channel.send('You do not have permission to use this command.');
         }
         
